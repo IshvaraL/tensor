@@ -40,7 +40,7 @@ class Stream:
                 self.videoframe = frame
                 self.lock.release()
             else:
-                break
+                self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-51-39.avi')
 
             if not self.sendFrame.is_alive() or not self.showFrame.is_alive():
                 break
