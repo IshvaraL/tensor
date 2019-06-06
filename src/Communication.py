@@ -16,7 +16,7 @@ class Comm:
 
     def send(self, message):
         data = str(message)
-        print(data)
+        # print(data)
         try:
             self.s.send(data.encode())
             self.s.send(b'<EOF>')

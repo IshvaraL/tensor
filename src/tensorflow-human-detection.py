@@ -114,14 +114,16 @@ class Main:
 
                     rx, ry = self.totuple(relative_coords[0][0])
                     cv2.circle(ref, (rx, ry), 10, (0, 0, 255), 4)
+
                     if rx > 0 and rx < width and ry > 0 and ry < height:
-                        coords.append(((x/width) * 16, 9-((y/height)*9)))
+                        coords.append((round((rx/width) * 16, 1), round(9-((ry/height)*9), 1)))
 
             cv2.imshow("transform", ref)
             cv2.imshow("preview", img)
 
             for x in range(len(coords), 8, 1):
-                coords.append((0,0))
+                coords.append((0.0,0.0))
+
 
             self.coords_lock.acquire()
             self.coords = coords
@@ -130,7 +132,7 @@ class Main:
             coords = []
 
             end_time = time.time()
-            print("Elapsed Time:", end_time - start_time)
+            # print("Elapsed Time:", end_time - start_time)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.str.terminate()
@@ -154,6 +156,7 @@ class Main:
     def update_game(self):
         print("Update over socket started...")
         com = Comm()
+        old_coords = []
         coords = []
 
         while True:
@@ -163,14 +166,10 @@ class Main:
                     coords = self.coords
                     self.coords_lock.release()
 
-                    if len(coords) > 8:
-                        coords = coords[0:8]
-
-                    elif len(coords) < 8:
-                        for x in range(len(coords), 8, 1):
-                            coords.append((0, 0))
+                    self.reorder_coords(coords, old_coords)
 
                     com.send(coords)
+                    old_coords = coords
                     time.sleep(0.1)
                     if not self.str.is_alive():
                         break
@@ -179,7 +178,69 @@ class Main:
                 break
         com.close()
 
+    def reorder_coords(self, new_coords, old_coords):
+        coords = []
+        if len(new_coords) > 8:
+            new_coords = new_coords[0:8]
+
+        elif len(new_coords) < 8:
+            for x in range(len(new_coords), 8, 1):
+                new_coords.append((0.0,0.0))
+
+        if len(new_coords) > len(old_coords) and len(new_coords) is 8:
+            return new_coords
+
+        coords = [(0,0)]*8
+
+        for idxo, oc in enumerate(old_coords):
+            surface_oldcoord = oc[0] * oc[1]
+
+            closest_idx = -1
+            closest_value = -1
+
+            last_diff = -1
+
+            for idxn, nc in enumerate(new_coords):
+                surface_newcoord = nc[0] * nc[1]
+                if surface_newcoord == surface_oldcoord and surface_oldcoord != 0:
+                    closest_idx = idxn
+                    closest_value = surface_newcoord
+                    last_diff = abs(surface_oldcoord - surface_newcoord)
+                    continue
+
+                if surface_newcoord == 0:
+                    print("New is 0")
+                    continue
+
+                if surface_oldcoord == 0:
+                    closest_idx = idxn
+                    closest_value = surface_newcoord
+                    last_diff = abs(surface_oldcoord - surface_newcoord)
+                    print("Old is 0")
+                    continue
+
+                if idxn == 0:
+                    closest_idx = idxn
+                    closest_value = surface_newcoord
+                    last_diff = abs(surface_oldcoord - surface_newcoord)
+                    continue
+
+                if abs(surface_oldcoord - surface_newcoord) < last_diff and abs(surface_oldcoord - surface_newcoord) < 2 :
+                    closest_idx = idxn
+                    closest_value = surface_newcoord
+                    last_diff = abs(surface_oldcoord - surface_newcoord)
+
+            if closest_idx is -1 and closest_value is -1 and last_diff is -1:
+                coords[idxo] = old_coords[idxo]
+            elif last_diff < 2:
+                coords[idxo] = new_coords[closest_idx]
+            else:
+                coords[idxo] = new_coords[idxo]
+
+        return coords
 
 if __name__ == "__main__":
     main = Main()
     main.start()
+
+#https://stackoverflow.com/questions/26194389/how-to-rearrange-array-based-upon-index-array
