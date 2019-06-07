@@ -158,6 +158,7 @@ class Main:
         com = Comm()
         old_coords = []
         coords = []
+        smart_coords = []
 
         while True:
             if com.open():
@@ -166,8 +167,8 @@ class Main:
                     coords = self.coords
                     self.coords_lock.release()
 
-                    self.reorder_coords(coords, old_coords)
-
+                    coords = self.reorder_coords(coords, old_coords)
+                    print(coords)
                     com.send(coords)
                     old_coords = coords
                     time.sleep(0.1)
@@ -179,7 +180,6 @@ class Main:
         com.close()
 
     def reorder_coords(self, new_coords, old_coords):
-        coords = []
         if len(new_coords) > 8:
             new_coords = new_coords[0:8]
 
@@ -188,9 +188,11 @@ class Main:
                 new_coords.append((0.0,0.0))
 
         if len(new_coords) > len(old_coords) and len(new_coords) is 8:
+            # smart_coords = (new_coords, 0)
             return new_coords
 
         coords = [(0,0)]*8
+        smart_coords = [[(0,0), 0]]*8
 
         for idxo, oc in enumerate(old_coords):
             surface_oldcoord = oc[0] * oc[1]
@@ -231,13 +233,20 @@ class Main:
                     last_diff = abs(surface_oldcoord - surface_newcoord)
 
             if closest_idx is -1 and closest_value is -1 and last_diff is -1:
-                coords[idxo] = old_coords[idxo]
+                smart_coords[idxo][0] = old_coords[idxo]
+                smart_coords[idxo][1] += 1
             elif last_diff < 2:
-                coords[idxo] = new_coords[closest_idx]
+                smart_coords[idxo][0] = new_coords[closest_idx]
+                smart_coords[idxo][1] = 0
             else:
                 coords[idxo] = new_coords[idxo]
 
+        for idxc, c in enumerate(smart_coords):
+
+            coords[idxc] = smart_coords[idxc][0]
+
         return coords
+
 
 if __name__ == "__main__":
     main = Main()
