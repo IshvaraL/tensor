@@ -167,10 +167,10 @@ class Main:
                     coords = self.coords
                     self.coords_lock.release()
 
-                    coords = self.reorder_coords(coords, old_coords)
-                    print(coords)
+                    # coords = self.reorder_coords(coords, old_coords)
+                    # print(coords)
                     com.send(coords)
-                    old_coords = coords
+                    # old_coords = coords
                     time.sleep(0.1)
                     if not self.str.is_alive():
                         break
@@ -211,14 +211,14 @@ class Main:
                     continue
 
                 if surface_newcoord == 0:
-                    print("New is 0")
+                    # print("New is 0")
                     continue
 
                 if surface_oldcoord == 0:
                     closest_idx = idxn
                     closest_value = surface_newcoord
                     last_diff = abs(surface_oldcoord - surface_newcoord)
-                    print("Old is 0")
+                    # print("Old is 0")
                     continue
 
                 if idxn == 0:

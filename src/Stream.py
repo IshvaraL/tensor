@@ -3,7 +3,7 @@ from multiprocessing import RLock
 import cv2
 import time
 import datetime
-from DetectorAPI import DetectorAPI
+
 save = False
 
 
@@ -21,9 +21,9 @@ class Stream:
             print("There is no pipe\n exiting now...")
             return
 
-        self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-51-39.avi')
-        # self.cap = cv2.VideoCapture('http://root:pass@10.42.80.102/axis-cgi/mjpg/video.cgi?streamprofile=Soccer&videokeyframeinterval=')
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        # self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-51-39.avi')
+        self.cap = cv2.VideoCapture('http://root:pass@10.42.80.102/axis-cgi/mjpg/video.cgi?streamprofile=Soccer&videokeyframeinterval=')
+        
         if self.cap.isOpened() is False:
             return
 
@@ -40,11 +40,13 @@ class Stream:
                 self.videoframe = frame
                 self.lock.release()
             else:
-                self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-51-39.avi')
+                # self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-51-39.avi')
+                break
 
             if not self.sendFrame.is_alive() or not self.showFrame.is_alive():
                 break
-            time.sleep(0.005)
+            # time.sleep(0.005)
+
         self.sendFrame.join()
         self.showFrame.join()
         self.cap.release()
