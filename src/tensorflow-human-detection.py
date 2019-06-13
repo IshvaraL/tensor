@@ -14,7 +14,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 CropOffset = 60
-
+threshold = 0.8 # threshold voor herkennen vanmensen.   0 is alles, 1 is niks
 
 class Main:
 
@@ -37,6 +37,7 @@ class Main:
         self.coords_lock = mp.RLock()
 
         self.coords = []
+
 
     def totuple(self, a):
         try:
@@ -74,9 +75,6 @@ class Main:
                 self.h, status = cv2.findHomography(pts_src, pts_dst)
                 np.save("../data/calibrated_3D", pts_src)
 
-
-        threshold = 0.7
-
         coords = []
 
         while True:
@@ -104,26 +102,25 @@ class Main:
                     box = boxes[i]
                     cv2.rectangle(img, (box[1], box[0]), (box[3], box[2]), (255, 0, 0), 2)
                     w = box[3] - box[1]
-                    middle_point = int(box[1]+(w/2)), int(box[2])
+                    h = box[2] - box[0]
+                    middle_point = int(box[1]+(w/2)), int(box[2]-h/2)
                     cv2.circle(img, (middle_point), 4, (0, 0, 255), 2)
-
-                    a = np.array([[middle_point[0]+x, middle_point[1]+y-CropOffset]], dtype='float32')
+                    a = np.array([[middle_point[0]+x, middle_point[1]+y-CropOffset+25]], dtype='float32')  # 25 pixels naar beneden om te compenseren voor de halve lengte persoon
                     a = np.array([a])
 
                     relative_coords = cv2.perspectiveTransform(a, self.h)
 
                     rx, ry = self.totuple(relative_coords[0][0])
                     cv2.circle(ref, (rx, ry), 10, (0, 0, 255), 4)
+                    padding = 1.15
+                    if rx > (width-(width*padding)) and rx < (width*padding) and ry > (height-(height*padding)) and ry < (height*padding):
+                        coords.append(((rx/width) * 16, 9-((ry/height)*9)))
 
-                    if rx > 0 and rx < width and ry > 0 and ry < height:
-                        coords.append((round((rx/width) * 16, 1), round(9-((ry/height)*9), 1)))
-
-            cv2.imshow("transform", ref)
+            #cv2.imshow("transform", ref)
             cv2.imshow("preview", img)
 
             for x in range(len(coords), 8, 1):
-                coords.append((0.0,0.0))
-
+                coords.append((0,0))
 
             self.coords_lock.acquire()
             self.coords = coords
@@ -132,7 +129,7 @@ class Main:
             coords = []
 
             end_time = time.time()
-            # print("Elapsed Time:", end_time - start_time)
+            #print("Elapsed Time:", end_time - start_time)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.str.terminate()
@@ -156,9 +153,7 @@ class Main:
     def update_game(self):
         print("Update over socket started...")
         com = Comm()
-        old_coords = []
         coords = []
-        smart_coords = []
 
         while True:
             if com.open():
@@ -167,10 +162,14 @@ class Main:
                     coords = self.coords
                     self.coords_lock.release()
 
-                    # coords = self.reorder_coords(coords, old_coords)
-                    # print(coords)
+                    if len(coords) > 8:
+                        coords = coords[0:8]
+
+                    elif len(coords) < 8:
+                        for x in range(len(coords), 8, 1):
+                            coords.append((0, 0))
+
                     com.send(coords)
-                    # old_coords = coords
                     time.sleep(0.1)
                     if not self.str.is_alive():
                         break
@@ -179,77 +178,7 @@ class Main:
                 break
         com.close()
 
-    def reorder_coords(self, new_coords, old_coords):
-        if len(new_coords) > 8:
-            new_coords = new_coords[0:8]
-
-        elif len(new_coords) < 8:
-            for x in range(len(new_coords), 8, 1):
-                new_coords.append((0.0,0.0))
-
-        if len(new_coords) > len(old_coords) and len(new_coords) is 8:
-            # smart_coords = (new_coords, 0)
-            return new_coords
-
-        coords = [(0,0)]*8
-        smart_coords = [[(0,0), 0]]*8
-
-        for idxo, oc in enumerate(old_coords):
-            surface_oldcoord = oc[0] * oc[1]
-
-            closest_idx = -1
-            closest_value = -1
-
-            last_diff = -1
-
-            for idxn, nc in enumerate(new_coords):
-                surface_newcoord = nc[0] * nc[1]
-                if surface_newcoord == surface_oldcoord and surface_oldcoord != 0:
-                    closest_idx = idxn
-                    closest_value = surface_newcoord
-                    last_diff = abs(surface_oldcoord - surface_newcoord)
-                    continue
-
-                if surface_newcoord == 0:
-                    # print("New is 0")
-                    continue
-
-                if surface_oldcoord == 0:
-                    closest_idx = idxn
-                    closest_value = surface_newcoord
-                    last_diff = abs(surface_oldcoord - surface_newcoord)
-                    # print("Old is 0")
-                    continue
-
-                if idxn == 0:
-                    closest_idx = idxn
-                    closest_value = surface_newcoord
-                    last_diff = abs(surface_oldcoord - surface_newcoord)
-                    continue
-
-                if abs(surface_oldcoord - surface_newcoord) < last_diff and abs(surface_oldcoord - surface_newcoord) < 2 :
-                    closest_idx = idxn
-                    closest_value = surface_newcoord
-                    last_diff = abs(surface_oldcoord - surface_newcoord)
-
-            if closest_idx is -1 and closest_value is -1 and last_diff is -1:
-                smart_coords[idxo][0] = old_coords[idxo]
-                smart_coords[idxo][1] += 1
-            elif last_diff < 2:
-                smart_coords[idxo][0] = new_coords[closest_idx]
-                smart_coords[idxo][1] = 0
-            else:
-                coords[idxo] = new_coords[idxo]
-
-        for idxc, c in enumerate(smart_coords):
-
-            coords[idxc] = smart_coords[idxc][0]
-
-        return coords
-
 
 if __name__ == "__main__":
     main = Main()
     main.start()
-
-#https://stackoverflow.com/questions/26194389/how-to-rearrange-array-based-upon-index-array

@@ -5,7 +5,7 @@ import time
 import datetime
 
 save = False
-
+camera = True
 
 class Stream:
 
@@ -21,9 +21,12 @@ class Stream:
             print("There is no pipe\n exiting now...")
             return
 
-        # self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-51-39.avi')
-        self.cap = cv2.VideoCapture('http://root:pass@10.42.80.102/axis-cgi/mjpg/video.cgi?streamprofile=Soccer&videokeyframeinterval=')
-        
+        if camera:
+            self.cap = cv2.VideoCapture('http://root:pass@10.42.80.102/axis-cgi/mjpg/video.cgi?streamprofile=Soccer&videokeyframeinterval=')
+        else:
+            self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-53-06_Trim.mp4')
+            #self.cap = cv2.VideoCapture('../vid/twee.avi')
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if self.cap.isOpened() is False:
             return
 
@@ -40,13 +43,15 @@ class Stream:
                 self.videoframe = frame
                 self.lock.release()
             else:
-                # self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-51-39.avi')
-                break
-
+                if camera:
+                    break
+                else:
+                    self.cap = cv2.VideoCapture('../vid/stream_2019-06-03_14-53-06_Trim.mp4')
+                    #self.cap = cv2.VideoCapture('../vid/twee.avi')
             if not self.sendFrame.is_alive() or not self.showFrame.is_alive():
                 break
-            # time.sleep(0.005)
-
+            if not camera:
+                time.sleep(0.025)
         self.sendFrame.join()
         self.showFrame.join()
         self.cap.release()
@@ -90,7 +95,7 @@ class Stream:
                 cv2.putText(frame, strfps, (10, 80), cv2.FONT_HERSHEY_PLAIN, 4, (0, 0, 255), 4, 2)
                 if save:
                     self.out.write(save_frame)
-                cv2.imshow('live', frame)
+                #cv2.imshow('live', frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
